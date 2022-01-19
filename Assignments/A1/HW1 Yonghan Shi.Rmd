@@ -1,0 +1,459 @@
+---
+title: "ECON 613 HW1"
+author: "Yonghan Shi"
+date: "1/15/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	prompt = TRUE
+)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(readr)
+library(ggplot2)
+setwd("/Users/whiz/Documents/GitHub/Econ613/Assignments/A1")
+```
+
+## Exercise 1 Basic Statistics
+
+• Number of households surveyed in 2007.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dathh2007 <- read.csv("Data/dathh2007.csv")
+
+x1 <- length(dathh2007$idmen)
+```
+
+The number of households surveyed in 2007 is `r x1`.
+
+• Number of households with marital status “Couple with kids” in 2005.
+
+```{r echo=FALSE}
+dathh2005 <- read.csv("Data/dathh2005.csv")
+
+x2 <- sum(dathh2005$mstatus=="Couple, with Kids")
+```
+
+The number of households with marital status "Couple with kids" in 2005 is `r x2`.
+
+• Number of individuals surveyed in 2008.
+
+```{r echo=FALSE}
+datind2008 <- read.csv("Data/datind2008.csv")
+
+x3 <- length(datind2008$idind)
+```
+
+The number of individuals surveyed in 2008 is `r x3`.
+
+• Number of individuals aged between 25 and 35 in 2016.
+
+```{r echo=FALSE}
+datind2016 <- read.csv("Data/datind2016.csv")
+
+x4 <- sum(datind2016$age>=25 & datind2016$age<=35)
+
+```
+
+The number of individuals aged between 25 and 35 in 2016 is `r x4`.
+
+• Cross-table gender/profession in 2009.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+datind2009 <- read.csv("Data/datind2009.csv")
+
+table5 <- table(datind2009[,c("gender", "profession")])
+
+kable(table5[,1:16], booktabs=TRUE)
+kable(table5[,17:32], booktabs=TRUE)
+```
+
+• Distribution of wages in 2005 and 2019. Report the mean, the standard deviation, the inter-decile ratio D9/D1 and the Gini coefficient.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+datind2005 <- read.csv("Data/datind2005.csv")
+datind2019 <- read.csv("Data/datind2019.csv")
+
+new2005 <- datind2005 %>% 
+  filter(!is.na(wage)) %>%
+  mutate(mean = mean(wage)) %>%
+  mutate(sd = sd(wage)) %>%
+  mutate(ratio = quantile(wage, 0.9) - quantile(wage, 0.1)) %>%
+  arrange(wage) %>%
+  mutate(Per = rank(wage)/n()) %>%
+  mutate(Per_wage = cumsum(wage)/sum(wage)) %>%
+  mutate(gini = sum(2*(Per - Per_wage)/n()))
+
+## same code different outcome, gini should be around 0.65, why?
+new2019 <- datind2019 %>% 
+  filter(!is.na(wage)) %>%
+  mutate(mean = mean(wage)) %>%
+  mutate(sd = sd(wage)) %>%
+  mutate(ratio = quantile(wage, 0.9) - quantile(wage, 0.1)) %>%
+  arrange(wage) %>%
+  mutate(Per = rank(wage)/n()) %>%
+  mutate(Per_wage = cumsum(wage)/sum(wage)) %>%
+  mutate(gini = sum(2*(Per - Per_wage)/n()))
+  
+table2005 <- new2005 %>% select(year, mean, sd, ratio, gini) %>% distinct()
+
+table2019 <- new2019 %>% select(year, mean, sd, ratio, gini) %>% distinct()
+
+table6 <- full_join(table2005, table2019)
+
+kable(table6)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+plot(density(datind2005$wage, na.rm = T), main = "Distribution of wages in 2005")
+
+plot(density(datind2019$wage, na.rm = T), main = "Distribution of wages in 2019")
+```
+\newpage
+
+• Distribution of age in 2010. Plot an histogram. Is there any difference between men and women?
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+datind2010 <- read.csv("Data/datind2010.csv")
+
+hist(datind2010$age, freq = F, main ="Histogram of age in 2010", xlab = "Age")
+lines(density(datind2010$age))
+
+datind2010 %>%
+  ggplot(aes(x=age)) +
+  geom_density(aes(color = gender))
+```
+The distribution is similar for men and women. 
+
+\newpage
+
+• Number of individuals in Paris in 2011.
+
+```{r echo=FALSE}
+datind2011 <- read.csv("Data/datind2011.csv")
+dathh2011 <- read.csv("Data/dathh2011.csv")
+
+data2011 <- full_join(datind2011, dathh2011, by = "idmen")
+
+x8 <- sum(data2011$location== "Paris", na.rm = T)
+```
+
+The number of individuals in Paris in 2011 is `r x8`.
+
+## Exercise 2 Merge Datasets
+
+• Read all individual datasets from 2004 to 2019. Append all these datasets.
+
+```{r echo=TRUE}
+library(dplyr)
+library(plyr)
+
+filelist <- list.files("Data")
+filelist_sampleid <- as.matrix(gsub(".csv","", filelist))
+
+filelist2 <- filelist[17:32]
+
+files2 <- paste("./Data/", filelist2, sep = "")
+
+datind = ldply(files2, read_csv)
+```
+
+
+• Read all household datasets from 2004 to 2019. Append all these datasets.
+
+```{r echo=TRUE}
+filelist1 <- filelist[1:16]
+
+files1 <- paste("./Data/", filelist1, sep = "")
+
+dathh = ldply(files1, read_csv)
+
+detach("package:plyr", unload = T)
+```
+
+• List the variables that are simultaneously present in the individual and household datasets.
+
+```{r message=FALSE, warning=FALSE}
+y1 <- intersect(colnames(dathh),colnames(datind))
+y1 <- y1[2:3]
+```
+
+They are `r y1`.
+
+• Merge the appended individual and household datasets.
+
+```{r echo=TRUE}
+# delete column of serial number
+dathh <- dathh[2:8]
+datind <- datind[2:10]
+
+datall <- merge(dathh, datind, by = c("idmen", "year"), all = TRUE)
+```
+
+In the second part, we use the newly created dataset from the previous to answer the following questions:
+
+• Number of households in which there are more than four family members
+
+```{r}
+familymem <- datall %>%
+  group_by(idmen, year) %>%
+  dplyr::mutate(n=n()) %>%
+  group_by(idmen) %>%
+  mutate(maxn = max(n))
+
+table25 <- familymem %>%
+  select(idmen, maxn) %>%
+  distinct(idmen, .keep_all = T)
+
+y5 <- sum(table25$maxn > 4)
+```
+
+The number of households in which there are more than four family members is `r y5`.
+
+• Number of households in which at least one member is unemployed
+
+```{r}
+familyemp <- datall %>% 
+  group_by(idmen) %>%
+  dplyr::mutate(member = n()) %>%
+  mutate(employ = sum(empstat == "Employed"))
+
+table21 <- familyemp %>% 
+  select(idmen, member, employ) %>%
+  distinct()
+
+table22 <- table21 %>%
+  mutate(notemploy = member - employ)
+
+y6 <- sum(table22$notemploy > 0)
+```
+
+The number of households in which at least one member is unemployed is `r y6`.
+
+• Number of households in which at least two members are of the same profession
+
+```{r}
+profes <- datall %>% 
+  filter(!is.na(profession)) %>%
+  group_by(idmen, year, profession) %>%
+  dplyr::mutate(nprof = n())%>%
+  group_by(idmen) %>%
+  mutate(nprofmax = max(nprof))
+
+table23 <- profes %>%
+  select(idmen, nprofmax) %>%
+  distinct()
+
+y7 <- sum(table23$nprofmax >= 2)
+```
+
+Number of households in which at least two members are of the same profession is `r y7`.
+
+• Number of individuals in the panel that are from household-Couple with kids
+
+```{r}
+coupkids <- datall %>%
+  filter(mstatus == "Couple, with Kids") %>%
+  group_by(year) %>%
+  mutate(number = n_distinct(idind))
+
+table28 <- coupkids %>%
+  select(year, number) %>%
+  distinct()%>%
+  t()
+
+kable(table28[,1:8], booktabs= TRUE)
+kable(table28[,9:16], booktabs = TRUE)
+
+```
+
+• Number of individuals in the panel that are from Paris.
+
+```{r}
+paris <- datall %>%
+  filter(location == "Paris") %>%
+  group_by(year) %>%
+  mutate(number = n_distinct(idind))
+
+table29 <- paris %>%
+  select(year, number) %>%
+  distinct()%>%
+  t()
+
+kable(table29[,1:8], booktabs= TRUE)
+kable(table29[,9:16], booktabs = TRUE)
+```
+
+• Find the household with the most number of family members. Report its idmen.
+
+```{r}
+table210 <- table25 %>%
+  ungroup %>%
+  filter(maxn == max(maxn))
+
+options(scipen = 200)
+y10 <- table210$idmen
+y10
+```
+
+The households with the most number of family members are `r y10`.
+
+• Number of households present in 2010 and 2011.
+
+```{r}
+hh1011 <- datall %>%
+  filter(year == c("2010", "2011"))
+
+table211 <- hh1011 %>%
+  select(year, idmen) %>%
+  distinct() %>%
+  group_by(year) %>%
+  dplyr::summarise(number = n())
+
+kable(table211)
+```
+
+## Exercise 3 Migration
+• Find out the year each household enters and exit the panel. Report the distribution of the time spent in the survey for each household.
+
+```{r}
+time <- datall %>%
+  group_by(idmen) %>%
+  mutate(enter = min(year)) %>%
+  mutate(exit = max(year))
+
+table31 <- time %>%
+  select(idmen, enter, exit) %>%
+  distinct(idmen, .keep_all = T ) %>%
+  mutate(time = exit - enter + 1)
+
+graph31 <- table31 %>% ggplot(aes(x=time)) +
+  geom_histogram() +
+  scale_x_continuous(breaks = seq(1,9,1), labels = c(paste0(seq(1,9,1))))
+
+print(graph31)
+```
+
+• Based on datent, identify whether or not a household moved into its current dwelling at the year of survey. Report the first 10 rows of your result and plot the share of individuals in that situation across years.
+
+```{r}
+enter <- datall %>%
+  select(idmen, year, datent, idind) %>%
+  mutate(move = datent == year)
+
+table321 <- head(enter, 10)
+
+table32 <- enter %>%
+  filter(!is.na(move)) %>%
+  group_by(year) %>%
+  mutate(share = sum(move) / n()) %>%
+  select(year, share) %>%
+  distinct()
+
+kable(table321)
+
+table32 %>% ggplot(aes(x= year)) + 
+  geom_col(aes(y = share)) 
+```
+
+• Based on myear and move, identify whether or not household migrated at the year of survey. Report the first 10 rows of your result and plot the share of individuals in that situation across years.
+
+```{r}
+migrat1 <- datall %>%
+  filter(year <= 2014) %>%
+  select(idmen, year, myear, idind) %>%
+  mutate(mig = myear == year)
+
+migrat2 <- datall %>%
+  filter(year > 2014) %>%
+  select(idmen, year, move, idind) %>%
+  mutate(mig = move == 2)
+
+migrat <- full_join(migrat1, migrat2)
+
+table331 <- head(migrat, 10)
+
+table33 <- migrat %>%
+  filter(!is.na(mig)) %>%
+  group_by(year) %>%
+  mutate(share = sum(mig) / n()) %>%
+  select(year, share) %>%
+  distinct()
+
+kable(table331)
+table33 %>% ggplot(aes(x= year)) + 
+  geom_col(aes(y = share)) 
+```
+
+• Mix the two plots you created above in one graph, clearly label the graph. Do you prefer one method over the other? Justify.
+
+```{r}
+table32n <- mutate(table32, type = "using datent")
+table33n <- mutate(table33, type = "using myear and move")
+table34 <- full_join(table32n, table33n, by = c("year", "type", "share"))
+
+table34 %>%
+  ggplot(aes(x=year)) +
+  geom_col(aes(y = share, color = type), position  = "dodge")
+```
+
+As the method in 3.4 contains two question types in the questionnaire, which could be less consistent. The samples might have different understanding of variable 'migration year' and 'moving' in the last period. Therefore, I would choose the method in 3.3.
+
+• For households who migrate,find out how many households had at least one family member changed his/her profession or employment status.
+
+```{r}
+change <- datall %>%
+  select(idmen, year, datent, empstat, idind, profession) %>%
+  mutate(move = datent == year) %>%
+  group_by(idind) %>%
+  mutate(pronumb = n_distinct(profession, na.rm = T)) %>%
+  mutate(empnumb = n_distinct(empstat, na.rm =T)) %>%
+  ungroup() %>%
+  filter(move == TRUE, pronumb >= 2 | empnumb >= 2)
+
+z4 <- length(unique(change$idmen))
+
+```
+
+There are `r z4` households who migrate had at least one family member changed profession.
+
+## Exercise 4 Attrition
+
+Compute the attrition across each year, where attrition is defined as the reduction in the number of individuals staying in the data panel. Report your final result as a table in proportions.
+Hint: Construct a year of entry and exit for each individual.
+
+```{r}
+timeind <- datall %>%
+  group_by(idind) %>%
+  mutate(enter = min(year)) %>%
+  mutate(exit = max(year) + 1 )
+
+indenter <- as.data.frame(table(timeind$enter))
+colnames(indenter) <- c("year", "enter")
+indexit <- as.data.frame(table(timeind$exit))
+colnames(indexit) <- c("year", "exit")
+indnumber <- as.data.frame(table(timeind$year))
+colnames(indnumber) <- c("year", "total")
+
+attrition <- indnumber %>%
+  full_join(indenter, by ="year") %>%
+  full_join(indexit, by ="year") %>%
+  mutate(attrition = (exit - enter)/total) %>%
+  filter(!is.na(attrition))%>%
+  select(year, attrition) %>%
+  t()
+
+
+kable(attrition[,1:8], booktabs= TRUE)
+kable(attrition[,9:15], booktabs = TRUE)
+```
+

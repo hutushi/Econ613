@@ -414,17 +414,32 @@ As the method in 3.4 contains two question types in the questionnaire, which cou
 change <- datall %>%
   select(idmen, year, datent, empstat, idind, profession) %>%
   mutate(move = datent == year) %>%
-  group_by(idind) %>%
-  mutate(pronumb = n_distinct(profession, na.rm = T)) %>%
-  mutate(empnumb = n_distinct(empstat, na.rm =T)) %>%
-  ungroup() %>%
-  filter(move == TRUE, pronumb >= 2 | empnumb >= 2)
+  mutate(profession = as.numeric(profession)) 
 
-z4 <- length(unique(change$idmen))
+a <- sub("Employed", "2", change$empstat)
+b <- sub("Retired", "1", a)
+c <- sub("Inactive", "0", b)
+d <- sub( "Unemployed", "-1", c)
+change$empstat <- d
+  
+change <- change %>%
+  mutate(empstat = as.numeric(empstat)) %>%
+  group_by(idind) %>%
+  arrange(year) %>%
+  mutate(changeprof = profession - lag(profession)) %>%
+  mutate(changeemp = empstat - lag(empstat)) %>%
+  mutate(change = changeprof !=0|changeemp !=0) %>%
+  filter(move == TRUE, change == TRUE)
+
+table35 <- change %>%
+  group_by(year) %>%
+  summarise(count = n_distinct(idmen)) %>%
+  t()
+
+kable(table35[,1:8], booktabs= TRUE)
+kable(table35[,9:15], booktabs = TRUE)
 
 ```
-
-There are `r z4` households who migrate had at least one family member changed profession.
 
 ## Exercise 4 Attrition
 

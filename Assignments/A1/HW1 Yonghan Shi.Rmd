@@ -343,6 +343,8 @@ graph31 <- table31 %>% ggplot(aes(x=time)) +
 print(graph31)
 ```
 
+\newpage
+
 • Based on datent, identify whether or not a household moved into its current dwelling at the year of survey. Report the first 10 rows of your result and plot the share of individuals in that situation across years.
 
 ```{r}
@@ -364,6 +366,8 @@ kable(table321)
 table32 %>% ggplot(aes(x= year)) + 
   geom_col(aes(y = share)) 
 ```
+
+\newpage
 
 • Based on myear and move, identify whether or not household migrated at the year of survey. Report the first 10 rows of your result and plot the share of individuals in that situation across years.
 
@@ -393,6 +397,8 @@ kable(table331)
 table33 %>% ggplot(aes(x= year)) + 
   geom_col(aes(y = share)) 
 ```
+
+\newpage
 
 • Mix the two plots you created above in one graph, clearly label the graph. Do you prefer one method over the other? Justify.
 

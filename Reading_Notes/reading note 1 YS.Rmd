@@ -1,0 +1,23 @@
+---
+title: "ECON 613 Reading Note 1"
+author: "Yonghan Shi"
+date: "1/25/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Focusing on the young lawyers in the United States as a representative of high-skilled professionals, this paper identifies gender gaps in performance, explores the possible causes of the performance gaps, and studies the impact of gender gaps in performance on the gaps in career outcomes. In general, the authors propose that there are gender gaps in performance between male and female lawyers, which are significantly affected by factors like having young children and aspirations for future career. The performance gaps also result in earning and promotion gaps.
+
+The authors first propose the puzzle asking why there are persistent earning gaps in legal profession. They notice that the previous explanation of individual characteristics is not comprehensive, and the gender gaps in other professions are not well explained as well. Thus, they pay attention to the gender gaps of performance and attempt to answer this question from this channel. The well-established way of measuring performance in legal industry makes it easier for the scholars to evaluate young lawyers' performance. Hours billed and new client revenue become the indicator for lawyers' performance.
+
+Based on such understandings, the paper makes two types of hypotheses. The first is the general hypothesis that there are gender gaps in performance of young lawyers, which affect their earning and promotion. The second concerns the possible cause of gender gaps in performance, including the widely believed reasons of discrimination, children rearing and newly proposed causes of career aspirations and other gender differences. These hypotheses create a potential causal chain to explain the phenomenon. 
+
+To test the hypotheses, the paper introduces the data from After the JD, which contains key variables indicating performances and other control variables such as time, education and region. The authors run several OLS regressions to find the relationship between variables, and then test the significance to validate the hypotheses.
+
+They start by identifying the gender gaps in performance. It is shown that holding other individual characteristics constant, there are significant differences in the two measurements of performance for female and male lawyers. Such differences cannot be explained by factors like target hours, hours worked and specialty. Thus, the data verifies the existence of gender gaps in performance.
+
+The paper then move to the most important part that answers the question what affects the gender gaps in performance. Starting with the hypothesis of discrimination, the authors regress several variables on performance including ones evaluating assignment, partner discounting, mentoring activities, contact with client and self-reported discrimination. The regression results show that they are either similar for male and female or not significant in determining their performance. Then, for the children rearing hypothesis, the paper finds out that rather than children numbers, having young children significantly affects young lawyers' performance gaps. It is worth noting that the influence of having young children is robust on hours billed but not robust on new client revenue, as the latter is mainly determined by factors like reputation. 
+

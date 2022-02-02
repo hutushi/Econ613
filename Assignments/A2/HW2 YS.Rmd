@@ -1,0 +1,230 @@
+---
+title: "Econ613 HW2"
+author: "Yonghan Shi"
+date: "1/30/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	prompt = TRUE
+)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+setwd("/Users/whiz/Documents/GitHub/Econ613/Assignments/A2")
+```
+
+## Exercise 1 OLS estimate
+
+Consider the following model $$Y =X\beta+\epsilon$$
+where X is the age of individuals plus intercept, and Y is the wage.
+
+```{r}
+data2009 <- read.csv("Data/datind2009.csv")
+data2009 <- data2009 %>%
+  select(empstat, wage, age)
+```
+
+
+• Calculate the correlation between Y and X.
+```{r}
+data1 <- data2009 %>%
+  filter(!is.na(wage)) %>%
+  filter(wage > 0) %>%
+  filter(age >= 18)
+
+x <- data1$age
+y <- data1$wage
+cor11 <- sum((x-mean(x))*(y-mean(y)))/(sqrt(sum((x-mean(x))^2)*sum((y-mean(y))^2)))
+```
+
+The correlation between Y and X is `r cor11`.
+
+• Calculate the coefficients on this regression.
+
+```{r}
+X <- cbind(1, data1$age)
+beta12 <- solve(t(X) %*% X) %*% (t(X) %*% data1$wage)
+rownames(beta12) <- c("intercept", "age")
+kable(t(beta12))
+```
+
+
+• Calculate the standard errors of $\beta$
+
+\quad – Using the standard formulas of the OLS.
+
+```{r}
+sigsqrt <- sum((y - X %*% beta12)^2)/(nrow(X)-ncol(X))
+varcov <- sigsqrt * chol2inv(chol(t(X)%*%X))
+stderr <- t(sqrt(diag(varcov)))
+table131 <- rbind(c("intercept","age"), stderr)
+kable(table13)
+```
+
+\quad – Using bootstrap with 49 and 499 replications respectively. Comment on the difference between the two strategies.
+```{r}
+boot = function(R){
+  nind = nrow(data1)
+  nvar = 2
+  outs = mat.or.vec(R,nvar)
+  set.seed(2022)
+  for (i in 1:R)
+    {
+    samp     = sample(1:nind,nind,rep=TRUE)
+    dat_samp = data1[samp,]
+    Xb = cbind(1, dat_samp$age)
+    yb = dat_samp$wage
+    outs[i,]     = solve(t(Xb) %*% Xb) %*% (t(Xb) %*% yb)
+    }
+  sd_est   = apply(outs,2,sd)
+  print(sd_est)}
+
+table132 <- rbind(boot(49),boot(499))
+rownames(table132) <- c("49 bootstrap","499 bootstrap") 
+colnames(table132) <- c("intercept standard errors","age standard error")
+
+kable(table132)
+```
+
+With more replications, the standard error will be smaller.
+
+## Exercise 2 Detrend Data
+
+Consider the same application as exercise 1 but using a pooled version of individual data from 2005 to 2018.
+
+```{r}
+library(plyr)
+
+filelist <- list.files("Data")
+
+files <- paste("./Data/", filelist, sep = "")
+
+datpool = ldply(files, read_csv)
+
+detach("package:plyr", unload = T)
+
+datpool <- datpool %>%
+  select(year, wage, age)
+```
+
+• Create a categorical variable ag, which bins the age variables into the following groups: “18-25”, “26-30”, “31-35”, “36-40”,“41-45”, “46-50”,“51-55”, “56-60”, and “60+”.
+
+```{r}
+datpool1 <- datpool %>% 
+  filter(!is.na(wage)) %>%
+  filter(wage > 0) %>%
+  filter(age >= 18) %>%
+  mutate(ag = as.factor(ifelse(age <= 25, "18-25",
+                        ifelse(age <= 30, "26-30",
+                        ifelse(age <= 35, "31-35",
+                        ifelse(age <= 40, "36-40",
+                        ifelse(age <= 45, "41-45",
+                        ifelse(age <= 50, "46-50",
+                        ifelse(age <= 55, "51-55",
+                        ifelse(age <= 60, "56-60", "60+"))))))))))
+```
+
+• Plot the wage of each age group across years. Is there a trend?
+
+```{r}
+ggplot(datpool1, aes(x=year, y=log(wage))) + 
+    geom_boxplot() +facet_wrap( ~ag, scales ="free")
+```
+
+
+• Consider $Y_{it} =\beta X_{it} + \gamma_t+ e_{it}$. After including a time fixed effect, how do the estimated coefficients change?
+
+```{r}
+datpool1 <- datpool1 %>%
+  mutate(year = as.factor(year))
+
+reg231 <- lm(datpool1$wage~datpool1$age)
+reg232 <- lm(datpool1$wage~ datpool1$age +datpool1$year)
+
+table23 <- rbind(reg231$coefficients, reg232$coefficients[1:2])
+rownames(table23) <- c("Original model", "Time fixed effect added")
+colnames(table23) <- c("intercept","age")
+
+kable(table23)
+```
+
+
+## Exercise 3 Numerical Optimization
+
+We are interested in the effect of age on labor market participation. We consider this problem using the data from 2007. Consider a probit model.
+
+• Exclude all individuals who are inactive.
+
+```{r}
+data2007 <- read.csv("Data/datind2007.csv")
+data3 <- data2007 %>%
+  select(wage, age, empstat) %>%
+  filter(empstat != "Inactive") %>%
+  mutate(empstat = as.factor(empstat))
+```
+
+
+• Write a function that returns the likelihood of the probit of being employed.
+
+You might want to write $X\beta$ first. Then, calculate $F(X\beta)$ and the log likelihood. Remember, for the probit model, $F(x)$ is the standard normal distribution function.
+
+```{r}
+
+```
+
+
+• Optimize the model and interpret the coefficients. You can use pre-programmed optimization packages.
+
+```{r}
+
+```
+
+• Can you estimate the same model including wages as a determinant of labor market participation? Explain.
+
+```{r}
+
+```
+
+## Exercise 4 Discrete choice
+
+We are interested in the effect of age on labor market participation. Use the pooled version of the data from 2005 to 2015. Additional controls include time-fixed effects.
+
+• Exclude all individuals who are inactive.
+
+```{r}
+
+```
+
+• Write and optimize the probit, logit, and the linear probability models.
+
+Remember, for the logit model, $F(x)$ is the logistic function $\dfrac{exp(x)}{(1+exp(x))}$
+
+```{r}
+
+```
+
+• Interpret and compare the estimated coefficients. How significant are they?
+
+```{r}
+
+```
+
+## Exercise 5 Marginal Effects
+• Compute the marginal effect of the previous probit and logit models.
+
+```{r}
+
+```
+
+• Construct the standard errors of the marginal effects. Hint: Boostrap may be the easiest way.
+
+```{r}
+
+```
+

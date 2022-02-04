@@ -1,0 +1,113 @@
+---
+title: "game1"
+author: "Yonghan Shi"
+date: "2/2/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+function1 = function(c, theta){
+  ifelse(theta !=1, return(c^(1-theta)/(1-theta)), return(log(c)))
+}
+
+crra_list = c()
+for (theta in seq(-0.5,1.5,0.01)){
+  crra_list = c(crra_list, function1(50,theta))
+}
+
+dat1 = data.frame(utility=crra_list,theta = seq(-0.5,1.5,0.01))
+
+ggplot(dat1,aes(x=theta,y=utility))+
+  geom_line()
+```
+
+```{r}
+l1_p1 = c(48,40,32,24,16,48,42,36,30,24,48,38,28,18,8,42,36,30,24,18,54,44,34,24,14)
+l1_p2 = c(48,64,80,96,112,48,66,84,102,120,48,62,76,90,104,42,60,78,96,114,54,68,82,96,110)
+l2_p1 <- c(40, 32, 24, 16, 8, 42, 36, 30, 24, 16, 38, 28, 18, 8, 0, 36, 30, 24, 18, 10, 44, 34, 24, 14, 6)
+l2_p2 <- c(64,80,96,112,120,66,84,102,120,128,62,76,90,104,112,60,78,96,114,122,68,82,96,110,118)
+dat_ex2 = data.frame(t(rbind(l1_p1, l1_p2, l2_p1, l2_p2)))
+
+gap = function(l1_p1,l1_p2,l2_p1,l2_p2,theta){
+  0.5*(function1(l1_p1, theta) + function1(l1_p2, theta) - function1(l2_p1,theta) -function1(l2_p2, theta))
+}
+
+install.packages("NLRoot")
+library(NLRoot)
+
+bisection <- function(f, l1_p1, l1_p2, l2_p1, l2_p2,a, b, n = 1000, tol = 1e-7) {
+  # If the signs of the function at the evaluated points, a and b, stop the function and return message.
+  if (!(f(l1_p1, l1_p2, l2_p1, l2_p2,a) < 0) && (f(l1_p1, l1_p2, l2_p1, l2_p2,b) > 0)) {
+    stop('signs of f(a) and f(b) differ')
+  } else if ((f(l1_p1, l1_p2, l2_p1, l2_p2,a) > 0) && (f(l1_p1, l1_p2, l2_p1, l2_p2,b) < 0)) {
+    stop('signs of f(a) and f(b) differ')
+  }
+  
+  for (i in 1:n) {
+    c <- (a + b) / 2 # Calculate midpoint
+    
+    # If the function equals 0 at the midpoint or the midpoint is below the desired tolerance, stop the 
+    # function and return the root.
+    if ((f(l1_p1, l1_p2, l2_p1, l2_p2,c) == 0) || ((b - a) / 2) < tol) {
+      return(c)
+    }
+    
+    # If another iteration is required, 
+    # check the signs of the function at the points c and a and reassign
+    # a or b accordingly as the midpoint to be used in the next iteration.
+    ifelse(sign(f(l1_p1, l1_p2, l2_p1, l2_p2,c)) == sign(f(l1_p1, l1_p2, l2_p1, l2_p2,a)), 
+           a <- c,
+           b <- c)
+  }
+  # If the max number of iterations is reached and no root has been found, 
+  # return message and end function.
+  print('Too many iterations')
+}
+
+
+func <- function(l1_p1, l1_p2, l2_p1, l2_p2, x){function1(l1_p1, x) + function1(l1_p2, x) -function1(l2_p1, x) -function1(l2_p2, x)}
+
+ra_list = c()
+for(index in 1:nrow(dat_ex2)){
+  l1_p1 = dat_ex2[index,1]
+  l1_p2 = dat_ex2[index,2]
+  l2_p1 = dat_ex2[index,3]
+  l2_p2 = dat_ex2[index,4]
+  temp = bisection(func,l1_p1, l1_p2, l2_p1, l2_p2,-100,100)
+  ra_list = c(ra_list,temp)
+}
+ra_list
+```
+
+
+```{r}
+like = function(dat_ex2,w,theta){
+  like_list = c()
+  for(index in 1:nrow(dat_ex2)){
+  l1_p1 = dat_ex2[index,1]
+  l1_p2 = dat_ex2[index,2]
+  l2_p1 = dat_ex2[index,3]
+  l2_p2 = dat_ex2[index,4]
+  v1 = function1(w + l1_p1,theta) + function1(w + l1_p2,theta)
+  v2 = function1(w + l2_p1,theta) + function1(w + l2_p2,theta)
+  like_list = c(like_list,plogis(v1-v2))
+  }
+  return(-sum(log(like_list))) # easy to use in optim
+}
+
+likelihood = like(dat_ex2,20,0)
+likelihood
+
+```
+
+```{r}
+function2 <- function(x, y){(1.5-x+x*y)^2 + (2.25-x+x*y^2)^2 +(2.625-x+x*y^3)^2}
+f_list = c()
+
+```
+

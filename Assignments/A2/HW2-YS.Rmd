@@ -337,7 +337,7 @@ mfxboot <- function(func,model,data,boot=99,digits=6){
   res <- cbind(marginal.effects,apply(bootvals,2,sd),marginal.effects/apply(bootvals,2,sd))
   if(names(x$coefficients[1])=="(Intercept)"){
     res1 <- res[2:nrow(res),]
-    res2 <- matrix(as.numeric(sprintf(paste("%.",paste(digits,"f",sep=""),sep=""),res1)),nrow=dim(res1)[1])     
+    res2 <- matrix(as.numeric(sprintf(paste("%.",paste(digits,"f",sep=""),sep=""),res1)),nrow=dim(res1)[1])
     rownames(res2) <- rownames(res1)
     } else {
     res2 <- matrix(as.numeric(sprintf(paste("%.",paste(digits,"f",sep=""),sep="")),nrow=dim(res)[1]))
@@ -354,8 +354,6 @@ mfxdat1 <- data.frame(cbind(rownames(mfx1),mfx1))
 
 mfx2 <- mfxboot(empstat ~ age + year, "logit", data4)
 mfxdat2 <- data.frame(cbind(rownames(mfx2),mfx2))
-
-
 
 table5 <- data.frame(rbind(mfxdat1[1,2:4],mfxdat2[1,2:4]))
 rownames(table5) <- c("probit", "logit")

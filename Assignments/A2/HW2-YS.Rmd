@@ -136,8 +136,13 @@ datpool1 <- datpool %>%
 datpool1 <- datpool1 %>%
   mutate(year = as.factor(year))
 
+ylim1<-boxplot.stats(datpool1$wage)$stats[c(1, 5)]
+
 ggplot(datpool1, aes(x=year, y=wage)) + 
-    geom_boxplot(aes(fill = ag))+ ylim(0,150000) + theme_bw()
+  geom_boxplot(aes(fill = ag), outlier.shape = 19, outlier.size = 0.2) + 
+  coord_cartesian(ylim = ylim1*3) +
+  theme_bw() +
+  guides(fill=guide_legend(title = "age group"))
 ```
 
 In general the wage peak of age group is moving from the elder to the middle ages. Younger people earn more during the period. 

@@ -1,0 +1,508 @@
+---
+title: "HW3-YS"
+author: "Yonghan Shi"
+date: "3/4/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	prompt = TRUE
+)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(dummies)
+setwd("/Users/whiz/Documents/GitHub/Econ613/Assignments/A3")
+rm(list = ls())
+```
+
+
+```{r}
+# read data
+datstu <- read.csv("Data/datstu_v2.csv")
+datjss <- read.csv("Data/datjss.csv")
+datsss <- read.csv("Data/datsss.csv")
+```
+
+## Exercise 1 Basic Statistics
+• Number of students, schools, programs
+
+```{r}
+nstu <- as.numeric(count(datstu))
+
+#number of schools being applied by students (not that in the data of schools, not that with students admitted
+
+nsch <- datstu %>%
+  gather(key = schoolcode, value = Value, schoolcode1, schoolcode2, schoolcode3, schoolcode4, schoolcode5, schoolcode6)%>%
+  summarise(distinct_school = n_distinct(Value, na.rm =TRUE))
+
+nsch <- as.numeric(nsch)
+
+npgm <- datstu %>%
+  gather(key = choicepgm, value = Value, choicepgm1, choicepgm2, choicepgm3, choicepgm4, choicepgm5, choicepgm6)%>%
+  summarise(distinct_program = n_distinct(Value, na.rm =TRUE))
+
+npgm <- as.numeric(npgm)
+
+table11 <- cbind(nstu, nsch, npgm)
+colnames(table11) <- c("student", "school", "program")
+kable(table11)
+```
+
+Note the number of school means the number of schools being applied by students (not that in the data of schools or that with students admitted).
+
+• Number of choices (school, program)
+(Hint: Create a matrix of school, programs. Convert data from Wide to Long)
+
+```{r}
+nchoice_pgm <- datstu %>%
+  select(V1, choicepgm1, choicepgm2, choicepgm3, choicepgm4, choicepgm5, choicepgm6) %>%
+  gather(key = choicepgm, value = program, choicepgm1, choicepgm2, choicepgm3, choicepgm4, choicepgm5, choicepgm6) 
+
+nchoice_pgm <- nchoice_pgm %>%
+  mutate(id = 1:nrow(nchoice_pgm))
+
+nchoice_sch <- datstu %>%
+  select(V1, schoolcode1, schoolcode2, schoolcode3, schoolcode4, schoolcode5, schoolcode6, jssdistrict) %>%
+  gather(key = schoolcode, value = school, schoolcode1, schoolcode2, schoolcode3, schoolcode4, schoolcode5, schoolcode6)
+
+nchoice_sch <- nchoice_sch %>%
+  mutate(id = 1:nrow(nchoice_sch))
+
+nchoice <- nchoice_sch %>%
+  full_join(nchoice_pgm, by= c("id", "V1")) %>%
+  select(V1, school, program, jssdistrict, choicepgm) %>%
+  filter(program != "") %>%
+  filter(!is.na(school))
+
+rm(nchoice_pgm, nchoice_sch)
+
+nch <- as.numeric(summarise(nchoice, distinct_choice = n_distinct(program, school)))
+```
+
+The number of choices is `r nch`.
+
+• Number of students applying to at least one senior high schools in the same district to home (Suppose students live in the same district to their junior high schools)
+
+```{r}
+dat13 <- datstu %>%
+  select(V1, schoolcode1, schoolcode2, schoolcode3, schoolcode4, schoolcode5, schoolcode6, jssdistrict)
+
+datsss13 <- datsss %>%
+  filter(!duplicated(schoolcode)) %>%
+  dplyr::select(schoolcode, sssdistrict)
+
+out13 <- dat13$V1
+for (i in 1:6){
+  dat <- dat13[,c(1,i+1,8)]
+  colnames(dat) <- c("id", "schoolcode", "jssdistrict")
+  dat <- dat %>% 
+    left_join(datsss13, by = "schoolcode") %>%
+    mutate(same = sssdistrict == jssdistrict) %>%
+    select(same)
+  out13 <- cbind(out13, dat)
+}
+
+colnames(out13) <- c("id","same1","same2", "same3", "same4", "same5", "same6")
+
+out13[is.na(out13)] <- FALSE
+
+out13 <- out13 %>% 
+  mutate(atleast = same1 + same2 + same3 + same4 + same5 + same6 != 0)
+
+rm(dat)
+rm(datsss13)
+rm(dat13)
+nsame <- as.numeric(sum(out13$atleast))
+```
+
+The number of students applying to at least one senior high schools in the same district to home is `r nsame`.
+
+• Number of students each senior high school admitted
+
+```{r}
+dat14 <- datstu %>%
+  select(V1, score, schoolcode1, schoolcode2, schoolcode3, schoolcode4, schoolcode5, schoolcode6, choicepgm1, choicepgm2, choicepgm3, choicepgm4, choicepgm5, choicepgm6, rankplace) %>%
+  filter(!is.na(rankplace))
+
+dat14 <- dat14 %>% 
+  mutate(admitted = ifelse(rankplace ==1 , schoolcode1,
+                                         ifelse(rankplace ==2, schoolcode2,
+                                                ifelse(rankplace==3, schoolcode3,
+                                                       ifelse(rankplace==4, schoolcode4,
+                                                              ifelse(rankplace==5, schoolcode5,
+                                                                     ifelse(rankplace==6, schoolcode6, NA))))))) %>%
+  mutate(program = ifelse(rankplace ==1 , choicepgm1,
+                                         ifelse(rankplace ==2, choicepgm2,
+                                                ifelse(rankplace==3, choicepgm3,
+                                                       ifelse(rankplace==4, choicepgm4,
+                                                              ifelse(rankplace==5, choicepgm5,
+                                                                     ifelse(rankplace==6, choicepgm6, NA))))))) %>%
+  select(V1, score, admitted, program)
+
+table14 <- dat14 %>%
+  group_by(admitted) %>%
+  mutate(nadmit = n()) %>%
+  ungroup() %>%
+  filter(!is.na(admitted))%>%
+  select(admitted, nadmit) %>%
+  distinct() %>%
+  arrange(admitted)
+
+colnames(table14) <- c("schoolcode","size")
+
+kable(head(table14))
+```
+
+• The cutoff of senior high schools (the lowest score to be admitted)
+
+```{r}
+table15 <- dat14 %>%
+  group_by(admitted) %>%
+  mutate(cutoff = min(score)) %>%
+  ungroup() %>%
+  filter(!is.na(admitted))%>%
+  select(admitted, cutoff) %>%
+  distinct()%>%
+  arrange(admitted)
+
+colnames(table15) <- c("schoolcode","cutoff")
+
+kable(head(table15))
+```
+
+• The quality of senior high schools (the average score of students admitted)
+
+```{r}
+table16 <- dat14 %>%
+  group_by(admitted) %>%
+  mutate(quality = mean(score))%>%
+  ungroup() %>%
+  filter(!is.na(admitted))%>%
+  select(admitted, quality) %>%
+  distinct()%>%
+  arrange(admitted)
+
+colnames(table16) <- c("schoolcode","quality")
+
+kable(head(table16))
+```
+
+## Exercise 2 Data
+
+```{r}
+datsss2 <- datsss %>%
+  filter(!duplicated(schoolcode)) %>%
+  select(!V1)
+
+dat2 <- dat14 %>%
+  group_by(admitted, program) %>%
+  mutate(size = n()) %>%
+  mutate(cutoff = min(score)) %>%
+  mutate(quality = mean(score))%>%
+  ungroup() %>%
+  filter(!is.na(admitted))%>%
+  select(admitted, program, size, cutoff, quality) %>%
+  distinct()
+
+colnames(dat2) <- c("schoolcode" , "program", "size", "cutoff", "quality")
+
+dat2 <- dat2 %>%
+  left_join(datsss2, by = "schoolcode")%>%
+  arrange(schoolcode)
+
+kable(head(dat2))
+```
+
+## Exercise 3 Distance
+
+```{r}
+colnames(nchoice) <- c("V1", "schoolcode", "program", "jssdistrict", "choice")
+
+datsss3 <- datsss2 %>%
+  select(schoolcode, ssslong, ssslat)
+
+dat3 <- nchoice %>%
+  left_join(datjss, by = "jssdistrict") %>%
+  left_join(datsss3, by = "schoolcode") %>%
+  mutate(choice_rank = ifelse(choice == "choicepgm1", 1,
+                                         ifelse(choice == "choicepgm2", 2,
+                                                ifelse(choice == "choicepgm3", 3,
+                                                       ifelse(choice == "choicepgm4", 4,
+                                                              ifelse(choice == "choicepgm5", 5, 6
+                                                                     ))))))  %>%
+  select(V1, schoolcode, program, point_x, point_y, ssslong, ssslat, choice_rank)
+
+colnames(dat3) <- c("V1", "schoolcode", "program", "jsslong", "jsslat", "ssslong", "ssslat", "choice_rank")
+
+dat3 <- dat3 %>%
+  mutate(dist = sqrt((69.172*(ssslong-jsslong)*cos(jsslat/57.3))^2 + (69.172*(ssslat-jsslat))^2))
+
+kable(head(dat3[,c(1:3,8,9)]))
+```
+
+## Exercise 4 Dimensionality Reduction
+
+
+• Recode the schoolcode into its first three digits (substr). Call this new variable scode_rev.
+
+• Recode the program variable into 4 categories: arts (general arts and visual arts), economics (business and home economics), science (general science) and others. Call this new variable pgm_rev.
+
+• Create a new choice variable choice_rev.
+
+• Recalculate the cutoff and the quality for each recoded choice.
+
+• Consider the 20,000 highest score students.
+
+• The rest of the assignment uses the recoded choices and the 20,000 highest score students.
+
+```{r}
+datind<- datstu %>%
+  select(V1, score, rankplace)
+
+dat4 <- nchoice %>%
+  #Recode the schoolcode
+  mutate(scode_rev = substr(schoolcode, 1, 3)) %>%
+  #Recode the program
+  mutate(pgm_rev = ifelse(program == "General Arts" | program == "Visual Arts", "Arts",
+                                         ifelse(program == "Business" | program == "Home Economics", "Economics",
+                                                ifelse(program == "General Science", "Science", "Others"))))%>%  
+  #Create a new choice variable
+  unite("choice_rev", scode_rev, pgm_rev, sep = " ", remove= FALSE) %>%
+  mutate(choice_rank = ifelse(choice == "choicepgm1", 1,
+                                         ifelse(choice == "choicepgm2", 2,
+                                                ifelse(choice == "choicepgm3", 3,
+                                                       ifelse(choice == "choicepgm4", 4,
+                                                              ifelse(choice == "choicepgm5", 5, 6
+                                                                     )))))) %>%
+  left_join(datind, by = "V1") %>%
+  filter(!is.na(rankplace)) %>%
+  mutate(admitted = rankplace == choice_rank) %>%
+  select(V1, scode_rev, pgm_rev, choice_rev, choice_rank, score, admitted)
+
+#calculate cutoff and quality
+dat4choice <- dat4 %>%
+  filter(admitted == TRUE) %>%
+  group_by(choice_rev) %>%
+  #Recalculate the cutoff and the quality
+  mutate(cutoff = min(score)) %>%
+  mutate(quality = mean(score))%>%
+  ungroup() %>%
+  distinct(choice_rev, cutoff, quality)
+
+# Add distance factor
+datdist <- select(dat3, V1, dist, choice_rank)
+
+dat4 <- dat4 %>%
+  left_join(dat4choice, by = "choice_rev") %>%
+  left_join(datdist, by = c("V1","choice_rank"))
+
+# Select 20000 with the highest score
+stu20000 <- datstu %>%
+  select(V1, score, agey, male) %>%
+  arrange(desc(score))
+
+stu20000 <- stu20000[1:20000,]
+
+dat4 <- stu20000 %>%
+  left_join(dat4, by = c("V1" , "score"))
+
+kable(head(dat4))
+```
+
+## Exercise 5 First Model
+
+• Propose a model specification. Write the Likelihood function.
+```{r}
+## interested in the first choice
+dat5 <- dat4 %>% 
+  filter(choice_rank == 1) %>%
+  mutate(choice=as.numeric(factor(choice_rev,ordered=TRUE)))
+```
+
+Test score is the same for each students, so we use multinomial logit model. 
+
+```{r echo=TRUE}
+## X and Y for the model
+X1 <- dat5 %>%
+  mutate(intercept = 1) %>%
+  select(intercept, score)
+
+X1 <- as.matrix(X1)
+
+Y1 <- dummy("choice_rev", data = dat5, sep="_")
+
+beta1 = solve(t(X1) %*% X1) %*% t(X1) %*% Y1
+
+# Likelihood Function for multinomial logit model
+mlogit.ll <- function(beta) {
+  B <- matrix(beta, nrow = 2, byrow = TRUE)
+  B[,1] <- 0
+  est <- exp(X1 %*% B)
+  Pr <- t(apply(est, 1, function(x) x / sum(x)))
+  Pr <- Pr*Y1
+  loglikelihood <- sum(log(rowSums(Pr)))
+  return(-loglikelihood)
+}
+```
+
+• Estimate parameters and compute marginal effect of the proposed model.
+```{r message=FALSE, warning=FALSE}
+# Optimization
+
+#res <- optim(beta1, mlogit.ll, method = "BFGS")
+#fit1 <- nlm(mlogit.ll, beta1)
+#out5 <- matrix(fit1$estimate, nrow = 2, byrow = TRUE)
+
+library(nnet)
+fit1 <- multinom(choice_rev ~ score, dat5)
+
+out5 <- t(coef(fit1))
+
+
+# Marginal Effect
+marginal.mlogit <- function(beta){
+  est <- exp(X1 %*% beta)
+  Pr <- t(apply(est, 1, function(x) x / sum(x)))
+  B1 <- matrix(rep(out5[1,],each=nrow(Pr)),nrow=nrow(Pr))
+  B2 <- Pr %*% t(beta)
+  B2 <- matrix(rep(B2[,1],each=ncol(beta)), ncol=ncol(beta), byrow=TRUE)
+  dB <- B1 - B2
+  PrOut <- Pr*dB
+  ME <- data.frame(t(apply(PrOut, 2, mean)))
+  return(ME)
+}
+
+ME.mlogit <- marginal.mlogit(out5)
+```
+
+Parameters:
+```{r}
+kable(out5[,1:6])
+```
+
+Marginal Effect:
+```{r}
+kable(ME.mlogit[,1:6])
+```
+
+## Exercise 6
+
+• Propose a model specification. Write the Likelihood function.
+
+School Quality is the same for each choice, so we use conditional logit model.
+
+```{r echo=TRUE}
+## X and Y for the model
+
+X2 <- dat5%>%
+  select(choice_rev, quality) %>%
+  filter(!duplicated(choice_rev)) %>%
+  arrange(choice_rev)
+  
+X2 <- t(data.frame(X2, row.names=1))
+
+X2f <- as.matrix(X2-X2[1])
+
+Y2 <- dummy("choice_rev", data = dat5, sep="_")
+
+beta2 <- runif(246,-1,1)
+
+# Likelihood Function for conditional logit model
+clogit.ll <- function(beta) {
+  B <- beta2[1]
+  A <- as.matrix(beta2[2:246])
+  A[1] <- 0
+  est <- exp(X2f * B + ( matrix(1,nrow = nrow(X2f * B),ncol = 1) %*% t(A)))
+  Pr <- t(apply(est, 1, function(x) x / sum(x)))
+  Pr <- matrix(rep(Pr,each=nrow(Y2)),nrow=nrow(Y2))
+  Pr <- Pr * Y2
+  loglikelihood <- sum(log(rowSums(Pr)))
+  return(-loglikelihood)
+}
+
+```
+
+• Estimate parameters and compute marginal effect of the proposed model.
+
+```{r}
+# Optimization
+fit2 <- nlm(clogit.ll, beta2)
+
+out6 <- as.data.frame(t(fit2$estimate[c(1,3:246)]))
+
+colnames(out6) <- c("intercept", colnames(Y2[,2:245]))
+
+# Marginal Effect
+marginal.clogit <- function(beta){
+  beta <- as.matrix(beta)
+  B <- beta[1]
+  est <- X2* B
+  A <- c(0,beta[2:245])
+  est <- exp(est + ( matrix(1,nrow = nrow(est),ncol = 1) %*% t(A)))
+  Pr <- t(apply(est, 1, function(x) x / sum(x)))
+  BPr <- B * colSums(Pr) 
+  BPr_diag <- matrix(rep(BPr,each=245),nrow=245) * diag(245)
+  BPr_sq <- B * (t(Pr) %*% Pr)
+  ME <- (BPr_diag - BPr_sq)/nrow(X2)
+  return(ME)
+}
+
+ME.clogit <- marginal.clogit(out6)
+```
+
+Parameters:
+```{r}
+kable(out6[1:6])
+```
+
+Marginal Effect:
+```{r}
+ME.clogit[1:6,1:6]
+```
+## Exercise 7 Counterfactual Simulations
+
+• Explain and justify, which model (first or second model) you think is appropriate to conduct this exercise.
+
+I think the first model is appropriate, as for the second model, moving "others" out won't affect the result much.
+
+• Calculate choice probabilities under the appropriate model.
+
+```{r}
+Pr72 <- as.data.frame(t(colSums(t(apply(exp(X1 %*% cbind(0, out5)), 1, function(x) x / sum(x))))/nrow(X1)))
+
+colnames(Pr72)[1] <- "100 Arts"
+
+kable(Pr72[,1:6])
+```
+
+• Simulate how these choice probabilities change when these choices are excluded.
+```{r message=FALSE, warning=FALSE}
+dat7 <- dat5 %>%
+  filter(pgm_rev != "Others")
+
+fit3 <- multinom(choice_rev ~ score, dat7)
+
+out7 <- t(coef(fit3))
+
+X3 <- dat7 %>%
+  mutate(intercept = 1) %>%
+  select(intercept, score)
+
+X3 <- as.matrix(X3)
+
+Pr73 <- as.data.frame(t(colSums(t(apply(exp(X3 %*% cbind(0, out7)), 1, function(x) x / sum(x))))/nrow(X3)))
+
+colnames(Pr73)[1] <- "100 Arts"
+
+kable(Pr73[,1:6])
+```
+
+The choice probabilities become higher when excluding those choices.
+
+

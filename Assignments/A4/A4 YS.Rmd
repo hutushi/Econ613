@@ -1,0 +1,324 @@
+---
+title: "A4 YS"
+author: "Yonghan Shi"
+date: "4/13/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	prompt = TRUE
+)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(dummies)
+setwd("/Users/whiz/Documents/GitHub/Econ613/Assignments/A4")
+rm(list = ls())
+```
+
+## Exercise 1 Preparing the Data
+• Create additional variable for the age of the agent ”age”, total work experience measured in years ”work exp”. Hint: ”CV WKSWK JOB DLI.01” denotes the number of weeks a person ever worked at JOB 01.
+
+```{r}
+# read data
+data <- read.csv("Data/dat_A4.csv")
+datapanel <- read.csv("Data/dat_A4_panel.csv")
+dat1 <- data %>%
+  mutate(age = 2019 - KEY_BDATE_Y_1997) %>%
+  mutate(work_exp_week = rowSums(select(data, CV_WKSWK_JOB_DLI.01_2019, CV_WKSWK_JOB_DLI.02_2019, CV_WKSWK_JOB_DLI.03_2019, CV_WKSWK_JOB_DLI.04_2019, CV_WKSWK_JOB_DLI.05_2019, CV_WKSWK_JOB_DLI.06_2019, CV_WKSWK_JOB_DLI.07_2019, CV_WKSWK_JOB_DLI.08_2019, CV_WKSWK_JOB_DLI.09_2019, CV_WKSWK_JOB_DLI.10_2019, CV_WKSWK_JOB_DLI.11_2019), na.rm = TRUE)) %>%
+  mutate(work_exp = work_exp_week / 52)
+```
+
+• Create additional education variables indicating total years of schooling from all variables related to education (eg, ”BIOLOGICAL FATHERS HIGHEST GRADE COMPLETED”) in our dataset.
+```{r}
+dat1 <- dat1 %>% 
+  mutate(CV_HGC_Indiv = ifelse(YSCH.3113_2019 == 1 , 0,
+                                         ifelse(YSCH.3113_2019 ==2, 9,
+                                                ifelse(YSCH.3113_2019 ==3, 12,
+                                                       ifelse(YSCH.3113_2019 ==4, 14,
+                                                              ifelse(YSCH.3113_2019 ==5, 16,
+                                                                     ifelse(YSCH.3113_2019 ==6, 18, 
+                                                                            ifelse(YSCH.3113_2019 == 7, 21, 19))))))))
+```
+
+
+• Provide the following visualizations.
+
+– Plot the income data (where income is positive) by i) age groups, ii) gender groups and iii) number of children
+
+```{r}
+
+dat13 <- dat1 %>%
+  mutate(age = as.factor(age)) %>%
+  mutate(sex = ifelse(KEY_SEX_1997 == 1, "Male", "Female")) %>%
+  mutate(nchild = as.factor(CV_BIO_CHILD_HH_U18_2019)) %>%
+  mutate(mari = as.factor(CV_MARSTAT_COLLAPSED_2019))
+
+dat131 <- dat13 %>%
+  filter(YINC_1700_2019 >0) 
+
+ggplot(dat131, aes(x= age, y= YINC_1700_2019)) + 
+    geom_boxplot()+
+  labs(y = "Income", x= "age")
+
+ggplot(dat131, aes(x= sex, y= YINC_1700_2019)) + 
+    geom_boxplot()+
+  labs(y = "Income", x= "gender")
+
+ggplot(dat131, aes(x= nchild, y= YINC_1700_2019)) + 
+    geom_boxplot()+
+  labs(y = "Income", x= "number of children")
+```
+
+
+– Table the share of “0” in the income data by i) age groups, ii) gender groups, iii) number of children and marital status
+
+```{r}
+table1321 <- dat13 %>%
+  group_by(age) %>%
+  mutate(s0age = sum(YINC_1700_2019 == 0, na.rm = TRUE) / n())%>%
+  select(age, s0age) %>%
+  distinct
+
+ggplot(table1321, aes(x = age, y = s0age)) +
+  geom_bar(stat = "identity")+
+  labs(y = "Share of 0 income")
+
+table1322 <- dat13 %>%
+  group_by(sex) %>%
+  mutate(s0sex = sum(YINC_1700_2019 == 0, na.rm = TRUE) / n())%>%
+  select(sex, s0sex) %>%
+  distinct
+
+ggplot(table1322, aes(x = sex, y = s0sex)) +
+  geom_bar(stat = "identity")+
+  labs(y = "Share of 0 income")
+
+table1323 <- dat13 %>%
+  group_by(nchild) %>%
+  mutate(s0nchild = sum(YINC_1700_2019 == 0, na.rm = TRUE) / n())%>%
+  select(nchild, s0nchild) %>%
+  distinct
+
+ggplot(table1323, aes(x = nchild, y = s0nchild)) +
+  geom_bar(stat = "identity")+
+  labs(y = "Share of 0 income")
+
+table1324 <- dat13 %>%
+  group_by(mari) %>%
+  mutate(s0mari = sum(YINC_1700_2019 == 0, na.rm = TRUE) / n())%>%
+  select(mari, s0mari) %>%
+  distinct
+
+ggplot(table1324, aes(x = mari, y = s0mari)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(name='Marital Status' , labels = c( "0" = "Never-married", "1" ="Married", "2" = "Separated", "3" = "Divorced", "4" =  "Widowed")) +
+  labs(y = "Share of 0 income")
+```
+
+– Interpret the visualizations from above
+
+
+
+## Exercise 2 Heckman Selection Model
+
+
+• Specify and estimate an OLS model to explain the income variable (where income is positive).
+
+```{r}
+
+dat2 <- dat13 %>%
+  filter(!is.na(YINC_1700_2019)) %>%
+  mutate(age = 2019 - KEY_BDATE_Y_1997) %>%
+  mutate(gender = ifelse(KEY_SEX_1997 == 1, 1, 0)) %>%
+  mutate(race = as.factor(KEY_RACE_ETHNICITY_1997)) %>%
+  mutate(math = TRANS_SAT_MATH_HSTR) %>%
+  mutate(mari = as.factor(CV_MARSTAT_COLLAPSED_2019)) %>%
+  mutate(ysch = CV_HGC_Indiv) %>%
+  mutate(inlf = YINC_1700_2019 != 0) %>%
+  mutate(nchild = ifelse(is.na(nchild), 0, nchild)) %>%
+  mutate(ysch =  ifelse(is.na(ysch), 0, ysch))
+
+OLS <- lm(YINC_1700_2019 ~ work_exp + I(work_exp^2) + ysch + gender + math + CV_URBAN.RURAL_2019 + mari, dat2)
+
+summary(OLS)
+```
+
+– Interpret the estimation results
+
+The results imply that education, gender, math score and working experience has a significant influence on income. Specifically, holding all other variables constant, a year more of education would result in 3613 dollars increase in income; being a male would result in a 12240 more income; a year more of working experience would result in approximately 1900 more dollars of income, this effect would dcrease with the increase of working experience.
+
+– Explain why there might be a selection problem when estimating an OLS this way.
+
+The OLS is measuring with samples that have positive income, which means they have jobs and are relatively advantaged among society. 
+
+• Explain why the Heckman model can deal with the selection problem.
+
+The two-stage model assumes a normal distribution in the first stage in order to depict the possibility of being selected (in this case, have job / income), and then include it in the second stage OLS to correct the bias.
+
+• Estimate a Heckman selection model (Note:You cannot use a pre-programmed Heckman selection package. Please write down the likelihood and optimize the two-stage Heckman model). Interpret the results from the Heckman selection model and compare the results to OLS results. Why does there exist a difference?
+
+```{r}
+firststage <- glm(inlf ~ age + ysch + gender + nchild, family=binomial(link="probit"), data=dat2)
+
+dat2$IMR <- dnorm(firststage$linear.predictors)/pnorm(firststage$linear.predictors)
+
+heckman    <- lm(YINC_1700_2019 ~ -1 +  work_exp + I(work_exp^2) + ysch + gender + math + CV_URBAN.RURAL_2019 + mari + IMR, 
+                  data=dat2, subset=(inlf==1))
+
+```
+
+OLS:
+```{r}
+summary(OLS)
+```
+
+Heckman:
+```{r}
+summary(heckman)
+```
+
+The absolute values of the coefficients in heckman is higher, as after including people without any income, the effects would be even bigger than before.
+
+## Excercise 3 Censoring
+
+• Plot a histogram to check whether the distribution of the income variable. What might be the censored value here?
+
+```{r}
+ggplot(dat2,aes(x=YINC_1700_2019)) + geom_histogram()
+```
+
+The values over 100000 are censored.
+
+• Propose a model to deal with the censoring problem. 
+
+We can use the Tobit Model to deal with the censoring problem.
+
+• Estimate the appropriate model with the censored data (please write down the likelihood function and optimize yourself without using the pre-programmed package)
+
+```{r}
+dat3 <- dat2 %>%
+  filter(!is.na(work_exp)) %>%
+  filter(!is.na(ysch)) %>%
+  filter(!is.na(gender)) %>%
+  filter(!is.na(math)) %>%
+  filter(!is.na(CV_URBAN.RURAL_2019)) %>%
+  mutate(income = YINC_1700_2019)
+
+## find the initial value using package
+library(AER)
+tobit <- tobit(income ~ work_exp + ysch + gender + math + CV_URBAN.RURAL_2019, left = -Inf, right = 100000, data = dat3)
+
+olstobit <- lm(income ~ work_exp + ysch + gender + math + CV_URBAN.RURAL_2019, data =  dat3)
+
+X <- model.matrix(olstobit)
+
+init <- c(coef(tobit), log_sigma = log(summary(olstobit)$sigma))
+
+tobit.ll <- function(par, X, y, ul = -Inf, ll = Inf) {
+  sigma = exp(par[length(par)])
+  beta = par[-length(par)]
+  
+  if(!is.infinite(ll)){
+    limit = ll
+    indicator = y > ll
+  } else {
+    limit = ul
+    indicator = y < ul
+  }
+  
+  est = X %*% beta
+  
+  ll = sum(indicator * log((1/sigma) * dnorm((y-est)/sigma))) + sum((1-indicator) * log(pnorm((est-limit)/sigma, lower = is.finite(ll))))
+  
+  -ll
+}
+
+fit_tobit = optim(
+  par = init,
+  tobit.ll,
+  y  = dat3$income,
+  X  = X,
+  ul = 100000,
+  method  = 'BFGS',
+  control = list(maxit = 16000, reltol = 1)
+)
+
+table3 <- rbind(fit_tobit$par, olstobit$coefficients)
+
+rownames(table3) <- c("Tobit", "OLS")
+```
+
+• Interpret the results above and compare to those when not correcting for the censored data
+
+The absolute values of the coefficients are higher than that of OLS regression. This is basically because of Tobit model 'recreate' the censored data in a model sense.
+
+## Excercise 4 Panel Data
+
+• Explain the potential ability bias when trying to explain to understand the determinants of wages
+
+A person's upbringing, family characteristics, innate ability and demographics (except age) can influence wage and they are potential ability bias.
+
+• Exploit the panel dimension of the data to propose a model to correct for the ability bias. Estimate the model using the following strategy.
+
+```{r}
+library(panelr)
+library(plyr)
+dat4long <- datapanel %>%
+  select(-CV_HIGHEST_DEGREE_1011_2010, -CV_HIGHEST_DEGREE_1112_2011, -CV_HIGHEST_DEGREE_1314_2013) %>%
+  rename(c("CV_HIGHEST_DEGREE_9899_1998" = "CV_HIGHEST_DEGREE_1998", "CV_HIGHEST_DEGREE_9900_1999" = "CV_HIGHEST_DEGREE_1999", "CV_HIGHEST_DEGREE_0001_2000" = "CV_HIGHEST_DEGREE_2000",  "CV_HIGHEST_DEGREE_0102_2001"  = "CV_HIGHEST_DEGREE_2001", "CV_HIGHEST_DEGREE_0203_2002"  = "CV_HIGHEST_DEGREE_2002", "CV_HIGHEST_DEGREE_0304_2003"  = "CV_HIGHEST_DEGREE_2003", "CV_HIGHEST_DEGREE_0405_2004"  = "CV_HIGHEST_DEGREE_2004",     "CV_HIGHEST_DEGREE_0506_2005"  = "CV_HIGHEST_DEGREE_2005", "CV_HIGHEST_DEGREE_0607_2006"  = "CV_HIGHEST_DEGREE_2006", "CV_HIGHEST_DEGREE_0708_2007"  = "CV_HIGHEST_DEGREE_2007", "CV_HIGHEST_DEGREE_0809_2008"  = "CV_HIGHEST_DEGREE_2008", "CV_HIGHEST_DEGREE_0910_2009"  = "CV_HIGHEST_DEGREE_2009", "CV_HIGHEST_DEGREE_EVER_EDT_2010" = "CV_HIGHEST_DEGREE_2010", "CV_HIGHEST_DEGREE_EVER_EDT_2011" = "CV_HIGHEST_DEGREE_2011", "CV_HIGHEST_DEGREE_EVER_EDT_2013" ="CV_HIGHEST_DEGREE_2013", "CV_HIGHEST_DEGREE_EVER_EDT_2015" = "CV_HIGHEST_DEGREE_2015", "CV_HIGHEST_DEGREE_EVER_EDT_2017"  = "CV_HIGHEST_DEGREE_2017", "CV_HIGHEST_DEGREE_EVER_EDT_2019" = "CV_HIGHEST_DEGREE_2019"))%>%
+  long_panel(prefix = "_", begin = 1997, end = 2019, label_location = "end") 
+
+
+dat4long$work_exp_week <- apply(select(as.data.frame(dat4long), CV_WKSWK_JOB_DLI.01, CV_WKSWK_JOB_DLI.02, CV_WKSWK_JOB_DLI.03, CV_WKSWK_JOB_DLI.04, CV_WKSWK_JOB_DLI.05, CV_WKSWK_JOB_DLI.06, CV_WKSWK_JOB_DLI.07, CV_WKSWK_JOB_DLI.08, CV_WKSWK_JOB_DLI.09, CV_WKSWK_JOB_DLI.10, CV_WKSWK_JOB_DLI.11, CV_WKSWK_JOB_DLI.12, CV_WKSWK_JOB_DLI.13, CV_WKSWK_JOB_DLI.14, CV_WKSWK_JOB_DLI.15), 1, sum,na.rm=T)
+
+dat4 <- as.data.frame(dat4long) %>%
+  mutate(wage = YINC.1700) %>%
+  mutate(work_exp = work_exp_week /52) %>%
+  mutate(mari = as.factor(CV_MARSTAT_COLLAPSED)) %>%
+  mutate(educ = ifelse(CV_HIGHEST_DEGREE == 1 , 0,
+                                         ifelse(CV_HIGHEST_DEGREE ==2, 9,
+                                                ifelse(CV_HIGHEST_DEGREE  ==3, 12,
+                                                       ifelse(CV_HIGHEST_DEGREE  ==4, 14,
+                                                              ifelse(CV_HIGHEST_DEGREE  ==5, 16,
+                                                                     ifelse(CV_HIGHEST_DEGREE  ==6, 18, 
+                                                                            ifelse(CV_HIGHEST_DEGREE == 7, 21, 19)))))))) %>%
+  mutate(year = wave) %>%
+  select(id, wage, educ, mari, work_exp, year)
+  
+```
+
+– Within Estimator.
+
+```{r}
+library(plm)
+dat4 <- pdata.frame(dat4, index = c("year"))
+reg1 <- plm(wage ~ educ + mari + work_exp, model = "within", data = dat4)
+summary(reg1)
+```
+
+– Between Estimator
+
+```{r}
+reg2 <- plm(wage ~ educ + mari + work_exp, model = "between", data = dat4)
+summary(reg2)
+```
+
+– Difference (any) Estimator
+
+```{r}
+reg3 <- plm(wage ~ educ + mari + work_exp, model = "fd", data = dat4)
+summary(reg3)
+```
+
+• Interpret the results from each model and explain why different models yield different parameter estimates
+
+The between model has the best goodness of fit. In the within model, the results implies the direct relationship while including fixed effect. In the between model, it shows the relationship of the dependent variable in a period. In the difference model, it means that one unit increase of the independent variable in a period would result in a bigger difference in the dependent variable in that period. For example, having one more year in education in the period would result in 460 more dollars earning. 
+
+For the different estimators, the independent variables X and predicted Y values are calculated in different ways, thus yield different parameter estimates. For First difference, it would be $Y_\textit{diff} = (Y_{t_i} - Y_{t_{i-1}})$, for between model, it would be $Y_{t_i} - \bar{Y_{i}}$, for the between model, it would be just $\bar{Y}$.
+
